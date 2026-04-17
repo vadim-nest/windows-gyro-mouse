@@ -24,7 +24,7 @@
         Click="TestMouseBtn_Click" Margin="0,0,0,8"/>
         <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
             <TextBlock Text="Sensitivity:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <Slider x:Name="SensSlider" Minimum="50" Maximum="20000" Value="500" 
+            <Slider x:Name="SensSlider" Minimum="50" Maximum="2000" Value="500" 
             Width="200" ValueChanged="SensSlider_ValueChanged"/>
             <TextBlock x:Name="SensLabel" Text="500" VerticalAlignment="Center" Margin="8,0,0,0"/>
         </StackPanel>
