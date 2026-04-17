@@ -1,4 +1,4 @@
-using Microsoft.UI.Xaml;
+﻿using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Data;
@@ -93,14 +93,32 @@ namespace GyroMouse
                 try
                 {
                     var result = await _udp.ReceiveAsync();
-                    var text = Encoding.UTF8.GetString(result.Buffer);
-                    Log($"UDP from {result.RemoteEndPoint}: {text.Trim()} ({result.Buffer.Length} bytes)");
+                    HandlePacket(result.Buffer);
                 }
                 catch (Exception ex)
                 {
                     Log($"UDP error: {ex.Message}");
                     break;
                 }
+            }
+        }
+
+        private float _sensitivity = 500f;
+
+        private void HandlePacket(byte[] data)
+        {
+            if (data.Length < 8) return;
+
+            float yawDelta = BitConverter.ToSingle(data, 0);
+            float pitchDelta = BitConverter.ToSingle(data, 4);
+
+            int dx = (int)(yawDelta * _sensitivity);
+            int dy = (int)(pitchDelta * _sensitivity);
+
+            if (dx != 0 || dy != 0)
+            {
+                MoveMouse(dx, dy);
+                Log($"Move: yaw={yawDelta:F4} pitch={pitchDelta:F4} → dx={dx} dy={dy}");
             }
         }
     }
