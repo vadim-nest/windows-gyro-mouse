@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "GyroMouse (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "GyroMouse (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
