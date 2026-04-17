@@ -1,8 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
@@ -10,9 +5,18 @@ using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Text;
+using System.Threading.Tasks;
 using Windows.Foundation;
 using Windows.Foundation.Collections;
-using System.Runtime.InteropServices;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -28,6 +32,7 @@ namespace GyroMouse
         {
             InitializeComponent();
             Log("App started.");
+            _ = StartUdpListenerAsync();
         }
 
         private void Log(string message)
@@ -74,6 +79,29 @@ namespace GyroMouse
         {
             MoveMouse(50, 50);
             Log("Mouse nudged +50, +50");
+        }
+
+        private UdpClient? _udp;
+
+        private async Task StartUdpListenerAsync()
+        {
+            _udp = new UdpClient(26760);
+            Log("UDP listening on port 26760...");
+
+            while (true)
+            {
+                try
+                {
+                    var result = await _udp.ReceiveAsync();
+                    var text = Encoding.UTF8.GetString(result.Buffer);
+                    Log($"UDP from {result.RemoteEndPoint}: {text.Trim()} ({result.Buffer.Length} bytes)");
+                }
+                catch (Exception ex)
+                {
+                    Log($"UDP error: {ex.Message}");
+                    break;
+                }
+            }
         }
     }
 }
