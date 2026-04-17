@@ -121,5 +121,11 @@ namespace GyroMouse
                 Log($"Move: yaw={yawDelta:F4} pitch={pitchDelta:F4} → dx={dx} dy={dy}");
             }
         }
+
+        private void SensSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
+        {
+            _sensitivity = (float)e.NewValue;
+            if (SensLabel != null) SensLabel.Text = ((int)_sensitivity).ToString();
+        }
     }
 }
