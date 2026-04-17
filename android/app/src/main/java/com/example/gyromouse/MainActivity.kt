@@ -21,6 +21,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
 
     private lateinit var sensorManager: SensorManager
     private var rotationSensor: Sensor? = null
+    private var isActivated = false
 
     // UI state
     private val logLines = mutableStateListOf<String>()
@@ -76,15 +77,19 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         val yaw   = Math.toDegrees(orientation[0].toDouble()).toFloat()
         val pitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
 
-        log("yaw=${yaw.toInt()}° pitch=${pitch.toInt()}°")
+//        log("yaw=${yaw.toInt()}° pitch=${pitch.toInt()}°")
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     override fun onGenericMotionEvent(event: android.view.MotionEvent): Boolean {
         val l2 = event.getAxisValue(android.view.MotionEvent.AXIS_LTRIGGER)
-        val isPressed = l2 > 0.5f
-        log("L2 axis=${"%.2f".format(l2)} pressed=$isPressed")
+        val wasActivated = isActivated
+        isActivated = l2 > 0.5f
+
+        if (isActivated != wasActivated) {
+            log(if (isActivated) ">>> ACTIVATED" else ">>> DEACTIVATED")
+        }
         return super.onGenericMotionEvent(event)
     }
 
