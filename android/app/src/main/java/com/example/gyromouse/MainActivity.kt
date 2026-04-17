@@ -80,6 +80,23 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    override fun onGenericMotionEvent(event: android.view.MotionEvent): Boolean {
+        val l2 = event.getAxisValue(android.view.MotionEvent.AXIS_LTRIGGER)
+        val isPressed = l2 > 0.5f
+        log("L2 axis=${"%.2f".format(l2)} pressed=$isPressed")
+        return super.onGenericMotionEvent(event)
+    }
+
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        log("KeyDown: $keyCode")
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent): Boolean {
+        log("KeyUp: $keyCode")
+        return super.onKeyUp(keyCode, event)
+    }
 }
 
 @Composable
