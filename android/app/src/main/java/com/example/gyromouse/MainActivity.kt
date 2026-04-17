@@ -22,6 +22,9 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private var rotationSensor: Sensor? = null
     private var isActivated = false
+    private var lastYaw   = 0f
+    private var lastPitch = 0f
+    private var justActivated = false
 
     // UI state
     private val logLines = mutableStateListOf<String>()
@@ -67,17 +70,30 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_GAME_ROTATION_VECTOR) return
 
-        // Convert quaternion to yaw/pitch angles
         val rotationMatrix = FloatArray(9)
         SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-
         val orientation = FloatArray(3)
         SensorManager.getOrientation(rotationMatrix, orientation)
 
         val yaw   = Math.toDegrees(orientation[0].toDouble()).toFloat()
         val pitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
 
-//        log("yaw=${yaw.toInt()}° pitch=${pitch.toInt()}°")
+        // On first frame after activation, set reference — don't move yet
+        if (justActivated) {
+            lastYaw   = yaw
+            lastPitch = pitch
+            justActivated = false
+            return
+        }
+
+        val dyaw   = yaw   - lastYaw
+        val dpitch = pitch - lastPitch
+        lastYaw   = yaw
+        lastPitch = pitch
+
+        if (isActivated) {
+            log("delta yaw=${"%.3f".format(dyaw)}° pitch=${"%.3f".format(dpitch)}°")
+        }
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -87,8 +103,11 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         val wasActivated = isActivated
         isActivated = l2 > 0.5f
 
-        if (isActivated != wasActivated) {
-            log(if (isActivated) ">>> ACTIVATED" else ">>> DEACTIVATED")
+        if (isActivated && !wasActivated) {
+            justActivated = true
+            log(">>> ACTIVATED")
+        } else if (!isActivated && wasActivated) {
+            log(">>> DEACTIVATED")
         }
         return super.onGenericMotionEvent(event)
     }
