@@ -20,6 +20,8 @@
         </Grid.RowDefinitions>
         <TextBlock Grid.Row="0" Text="GyroMouse — Windows Receiver" 
                FontSize="20" Margin="0,0,0,12"/>
+        <Button x:Name="TestMouseBtn" Content="Test Mouse (+50,+50)" 
+                Click="TestMouseBtn_Click" Margin="0,0,0,8"/>
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
             <TextBlock x:Name="LogBox" TextWrapping="Wrap" FontFamily="Consolas"/>
         </ScrollViewer>
