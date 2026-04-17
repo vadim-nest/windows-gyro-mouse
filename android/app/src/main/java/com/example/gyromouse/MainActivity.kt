@@ -44,8 +44,8 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                 if (udpSocket == null) udpSocket = java.net.DatagramSocket()
                 val buf = java.nio.ByteBuffer.allocate(8)
                 buf.order(java.nio.ByteOrder.LITTLE_ENDIAN)
-                buf.putFloat(dyaw)
-                buf.putFloat(dpitch)
+                buf.putFloat(Math.toRadians(dyaw.toDouble()).toFloat())
+                buf.putFloat(Math.toRadians(dpitch.toDouble()).toFloat())
                 val data = buf.array()
                 val packet = java.net.DatagramPacket(
                     data, data.size,
@@ -110,8 +110,10 @@ class MainActivity : ComponentActivity(), SensorEventListener {
             return
         }
 
-        val dyaw   = yaw   - lastYaw
-        val dpitch = pitch - lastPitch
+        val dyaw   = yaw - lastYaw
+        // The minus sign here fixes the "inverted" feel
+        val dpitch = -(pitch - lastPitch)
+
         lastYaw   = yaw
         lastPitch = pitch
 
