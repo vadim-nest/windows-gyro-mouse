@@ -28,7 +28,7 @@
             </intent-filter>
         </activity>
 
-        <!-- The Foreground Service -->
+        <!-- The Foreground Service declaration -->
         <service
             android:name=".GyroService"
             android:foregroundServiceType="specialUse"
