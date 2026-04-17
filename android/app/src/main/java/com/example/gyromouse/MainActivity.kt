@@ -19,6 +19,10 @@ import com.example.gyromouse.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity(), SensorEventListener {
 
+    private val PC_IP   = "192.168.1.182"  // ← your PC's local IP
+    private val PC_PORT = 26760
+    private var udpSocket: java.net.DatagramSocket? = null
+
     private lateinit var sensorManager: SensorManager
     private var rotationSensor: Sensor? = null
     private var isActivated = false
@@ -32,6 +36,26 @@ class MainActivity : ComponentActivity(), SensorEventListener {
     private fun log(msg: String) {
         logLines.add(msg)
         if (logLines.size > 100) logLines.removeAt(0) // keep last 100 lines
+    }
+
+    private fun sendMotion(dyaw: Float, dpitch: Float) {
+        Thread {
+            try {
+                if (udpSocket == null) udpSocket = java.net.DatagramSocket()
+                val buf = java.nio.ByteBuffer.allocate(8)
+                buf.order(java.nio.ByteOrder.LITTLE_ENDIAN)
+                buf.putFloat(dyaw)
+                buf.putFloat(dpitch)
+                val data = buf.array()
+                val packet = java.net.DatagramPacket(
+                    data, data.size,
+                    java.net.InetAddress.getByName(PC_IP), PC_PORT
+                )
+                udpSocket!!.send(packet)
+            } catch (e: Exception) {
+                log("UDP error: ${e.message}")
+            }
+        }.start()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -92,7 +116,7 @@ class MainActivity : ComponentActivity(), SensorEventListener {
         lastPitch = pitch
 
         if (isActivated) {
-            log("delta yaw=${"%.3f".format(dyaw)}° pitch=${"%.3f".format(dpitch)}°")
+            sendMotion(dyaw, dpitch)
         }
     }
 
