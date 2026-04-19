@@ -34,7 +34,8 @@ class GyroService : Service(), SensorEventListener {
     private var gyroSensor: Sensor? = null
     private val udpExecutor = Executors.newSingleThreadExecutor()
 
-    private val sendBuffer = ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN)
+    // 20 Bytes: Yaw, Pitch, Sens, ToggleMode, ActButton
+    private val sendBuffer = ByteBuffer.allocate(20).order(ByteOrder.LITTLE_ENDIAN)
     private val sendDataArray = sendBuffer.array()
     private var udpPacket: DatagramPacket? = null
 
@@ -42,6 +43,7 @@ class GyroService : Service(), SensorEventListener {
     private var isPitchReversed = false
     private var sensitivity = 500f
     private var isToggleMode = false
+    private var actBtn = 0 // 0=L2, 1=R2, 2=L1, 3=R1
 
     override fun onCreate() {
         super.onCreate()
@@ -77,6 +79,7 @@ class GyroService : Service(), SensorEventListener {
         isPitchReversed = prefs.getBoolean("revPitch", false)
         sensitivity = prefs.getFloat("sens", 500f)
         isToggleMode = prefs.getBoolean("toggleMode", false)
+        actBtn = prefs.getInt("actBtn", 0)
 
         if (intent?.action == ACTION_STOP_SERVICE) {
             stopSelf()
@@ -106,9 +109,9 @@ class GyroService : Service(), SensorEventListener {
     }
 
     private fun sendMotion(dyaw: Float, dpitch: Float) {
-        // We capture the current settings values right here, right now
         val currentSens = sensitivity
         val currentToggle = if (isToggleMode) 1f else 0f
+        val currentBtn = actBtn.toFloat()
 
         udpExecutor.execute {
             try {
@@ -117,21 +120,18 @@ class GyroService : Service(), SensorEventListener {
                 if (udpPacket == null) {
                     udpPacket = DatagramPacket(sendDataArray, sendDataArray.size, InetAddress.getByName(PC_IP), PC_PORT)
                 } else if (udpPacket!!.address.hostAddress != PC_IP) {
-                    // Update IP address if you changed it in the UI
                     udpPacket!!.address = InetAddress.getByName(PC_IP)
                 }
 
-                // Reuse the same memory block!
                 sendBuffer.clear()
                 sendBuffer.putFloat(dyaw)
                 sendBuffer.putFloat(dpitch)
                 sendBuffer.putFloat(currentSens)
                 sendBuffer.putFloat(currentToggle)
+                sendBuffer.putFloat(currentBtn)
 
                 udpSocket!!.send(udpPacket!!)
-            } catch (e: Exception) {
-                // Ignore background network blips
-            }
+            } catch (e: Exception) { }
         }
     }
 

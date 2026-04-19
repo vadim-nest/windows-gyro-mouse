@@ -54,13 +54,15 @@ class MainActivity : ComponentActivity() {
                     var toggleMode by remember { mutableStateOf(prefs.getBoolean("toggleMode", false)) }
                     var rot90 by remember { mutableStateOf(prefs.getBoolean("rot90", false)) }
                     var revPitch by remember { mutableStateOf(prefs.getBoolean("revPitch", false)) }
+                    var actBtn by remember { mutableIntStateOf(prefs.getInt("actBtn", 0)) }
 
-                    // Toggle visibility state
                     var showSettings by remember { mutableStateOf(prefs.getBoolean("showSettings", false)) }
-
                     var isServiceRunning by remember { mutableStateOf(GyroService.isRunning) }
-                    var expandedDropdown by remember { mutableStateOf(false) }
+                    var expandedIpDropdown by remember { mutableStateOf(false) }
+                    var expandedBtnDropdown by remember { mutableStateOf(false) }
                     var showSaveDialog by remember { mutableStateOf(false) }
+
+                    val buttonOptions = listOf("L2 (Left Trigger)", "R2 (Right Trigger)", "L1 (Left Bumper)", "R1 (Right Bumper)")
 
                     fun saveSettings() {
                         prefs.edit()
@@ -70,6 +72,7 @@ class MainActivity : ComponentActivity() {
                             .putBoolean("rot90", rot90)
                             .putBoolean("revPitch", revPitch)
                             .putBoolean("showSettings", showSettings)
+                            .putInt("actBtn", actBtn)
                             .apply()
 
                         if (isServiceRunning) {
@@ -106,7 +109,6 @@ class MainActivity : ComponentActivity() {
                             .padding(horizontal = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        // 1. Added more top padding
                         Spacer(modifier = Modifier.height(64.dp))
 
                         Text("GyroMouse", style = MaterialTheme.typography.headlineLarge)
@@ -140,12 +142,12 @@ class MainActivity : ComponentActivity() {
                                 label = { Text("PC IP Address") },
                                 modifier = Modifier.fillMaxWidth(),
                                 trailingIcon = {
-                                    TextButton(onClick = { expandedDropdown = true }) { Text("▼") }
+                                    TextButton(onClick = { expandedIpDropdown = true }) { Text("▼") }
                                 }
                             )
                             DropdownMenu(
-                                expanded = expandedDropdown,
-                                onDismissRequest = { expandedDropdown = false },
+                                expanded = expandedIpDropdown,
+                                onDismissRequest = { expandedIpDropdown = false },
                                 modifier = Modifier.fillMaxWidth(0.8f)
                             ) {
                                 ipList.forEach { savedIp ->
@@ -153,7 +155,7 @@ class MainActivity : ComponentActivity() {
                                         text = { Text("${savedIp.first} (${savedIp.second})") },
                                         onClick = {
                                             ipAddress = savedIp.second
-                                            expandedDropdown = false
+                                            expandedIpDropdown = false
                                             saveSettings()
                                         }
                                     )
@@ -162,7 +164,7 @@ class MainActivity : ComponentActivity() {
                                 DropdownMenuItem(
                                     text = { Text("Save current IP...") },
                                     onClick = {
-                                        expandedDropdown = false
+                                        expandedIpDropdown = false
                                         showSaveDialog = true
                                     }
                                 )
@@ -173,7 +175,6 @@ class MainActivity : ComponentActivity() {
                         HorizontalDivider()
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // 2. Settings Header with Toggle
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
@@ -195,7 +196,6 @@ class MainActivity : ComponentActivity() {
                             )
                         }
 
-                        // 3. Conditional Visibility
                         if (showSettings) {
                             Spacer(modifier = Modifier.height(16.dp))
 
@@ -206,6 +206,33 @@ class MainActivity : ComponentActivity() {
                                 valueRange = 100f..2000f,
                                 steps = 18
                             )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Activation Button Dropdown
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Text("Activation Button", modifier = Modifier.weight(1f))
+                                Box {
+                                    OutlinedButton(onClick = { expandedBtnDropdown = true }) {
+                                        Text("${buttonOptions[actBtn]} ▼")
+                                    }
+                                    DropdownMenu(
+                                        expanded = expandedBtnDropdown,
+                                        onDismissRequest = { expandedBtnDropdown = false }
+                                    ) {
+                                        buttonOptions.forEachIndexed { index, name ->
+                                            DropdownMenuItem(
+                                                text = { Text(name) },
+                                                onClick = {
+                                                    actBtn = index
+                                                    expandedBtnDropdown = false
+                                                    saveSettings()
+                                                }
+                                            )
+                                        }
+                                    }
+                                }
+                            }
 
                             Spacer(modifier = Modifier.height(16.dp))
 
@@ -237,7 +264,8 @@ class MainActivity : ComponentActivity() {
                                 toggleMode = false
                                 rot90 = false
                                 revPitch = false
-                                showSettings = false // Collapse on reset
+                                actBtn = 0 // Resets to L2
+                                showSettings = false
                                 ipList = listOf(Pair("Default", "192.168.1.182"))
                                 prefs.edit().putString("savedIps", serializeIps(ipList)).apply()
                                 saveSettings()

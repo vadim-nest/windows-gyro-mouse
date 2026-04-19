@@ -19,10 +19,11 @@ namespace GyroMouse
             new Controller(UserIndex.Four)
         };
 
-        private bool _isL2Pressed = false;
-        private bool _wasL2Pressed = false;
+        private bool _isBtnPressed = false;
+        private bool _wasBtnPressed = false;
         private bool _isToggleActive = false;
         private bool _isAnyControllerConnected = false;
+        private int _activeButton = 0; // 0=L2, 1=R2, 2=L1, 3=R1
         private DateTime _lastUiUpdate = DateTime.MinValue;
 
         public MainWindow()
@@ -47,32 +48,32 @@ namespace GyroMouse
             if ((DateTime.Now - _lastUiUpdate).TotalMilliseconds > 50)
             {
                 _lastUiUpdate = DateTime.Now;
-                string l2Status;
+                string btnName = _activeButton switch { 0 => "L2", 1 => "R2", 2 => "L1", 3 => "R1", _ => "Btn" };
+                string btnStatus;
 
                 if (!_isAnyControllerConnected)
                 {
-                    l2Status = "N/A (No Controller - Always Active)";
+                    btnStatus = "N/A (No Controller - Always Active)";
                 }
                 else if (isToggleMode)
                 {
-                    l2Status = _isToggleActive ? "TOGGLED ON" : "TOGGLED OFF";
-                    l2Status += $" (L2 Pressed: {_isL2Pressed})";
+                    btnStatus = _isToggleActive ? "TOGGLED ON" : "TOGGLED OFF";
+                    btnStatus += $" ({btnName} Pressed: {_isBtnPressed})";
                 }
                 else
                 {
-                    l2Status = _isL2Pressed ? "HELD (Active)" : "RELEASED (Ignored)";
+                    btnStatus = _isBtnPressed ? "HELD (Active)" : "RELEASED (Ignored)";
                 }
 
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    LiveStatsBox.Text = $"Mode: {(isToggleMode ? "Toggle" : "Hold")}\nController: {l2Status}\nYaw:   {yaw,8:F4} | Pitch: {pitch,8:F4}\nMouse: dx={dx,4} | dy={dy,4}";
+                    LiveStatsBox.Text = $"Mode: {(isToggleMode ? "Toggle" : "Hold")} | Target: {btnName}\nController: {btnStatus}\nYaw:   {yaw,8:F4} | Pitch: {pitch,8:F4}\nMouse: dx={dx,4} | dy={dy,4}";
                 });
             }
         }
-        [DllImport("user32.dll")]
-        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 
-        [StructLayout(LayoutKind.Sequential)]
+        [DllImport("user32.dll")]
+        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize); [StructLayout(LayoutKind.Sequential)]
         private struct INPUT { public uint type; public MOUSEINPUT mi; }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -117,7 +118,7 @@ namespace GyroMouse
             while (true)
             {
                 bool anyConnected = false;
-                bool anyL2 = false;
+                bool anyBtn = false;
 
                 foreach (var ctrl in _controllers)
                 {
@@ -125,22 +126,33 @@ namespace GyroMouse
                     {
                         anyConnected = true;
                         var state = ctrl.GetState();
-                        if (state.Gamepad.LeftTrigger > 30)
+                        bool currentBtnState = false;
+
+                        // Check the specific button requested by Android
+                        switch (_activeButton)
                         {
-                            anyL2 = true;
+                            case 0: currentBtnState = state.Gamepad.LeftTrigger > 30; break;
+                            case 1: currentBtnState = state.Gamepad.RightTrigger > 30; break;
+                            case 2: currentBtnState = (state.Gamepad.Buttons & GamepadButtonFlags.LeftShoulder) != 0; break;
+                            case 3: currentBtnState = (state.Gamepad.Buttons & GamepadButtonFlags.RightShoulder) != 0; break;
+                        }
+
+                        if (currentBtnState)
+                        {
+                            anyBtn = true;
                             break;
                         }
                     }
                 }
 
-                // Edge detection for Toggle Mode (only triggers once per pull)
-                if (anyL2 && !_wasL2Pressed)
+                // Edge detection for Toggle Mode (only triggers once per press)
+                if (anyBtn && !_wasBtnPressed)
                 {
                     _isToggleActive = !_isToggleActive;
                 }
 
-                _wasL2Pressed = anyL2;
-                _isL2Pressed = anyL2;
+                _wasBtnPressed = anyBtn;
+                _isBtnPressed = anyBtn;
                 _isAnyControllerConnected = anyConnected;
 
                 await Task.Delay(20);
@@ -149,18 +161,20 @@ namespace GyroMouse
 
         private void HandlePacket(byte[] data)
         {
-            // Now requires 16 bytes (v2 Protocol)
-            if (data.Length < 16) return;
+            // Now requires 20 bytes (v3 Protocol)
+            if (data.Length < 20) return;
 
             float yawDelta = BitConverter.ToSingle(data, 0);
             float pitchDelta = BitConverter.ToSingle(data, 4);
             float sensitivity = BitConverter.ToSingle(data, 8);
             bool isToggleMode = BitConverter.ToSingle(data, 12) > 0.5f;
 
+            // Extract the requested button (0=L2, 1=R2, 2=L1, 3=R1)
+            _activeButton = (int)BitConverter.ToSingle(data, 16);
+
             int dx = (int)(yawDelta * sensitivity);
             int dy = (int)(pitchDelta * sensitivity);
 
-            // Determine if mouse is allowed to move right now
             bool isMovementAllowed = false;
             if (!_isAnyControllerConnected)
             {
@@ -172,7 +186,7 @@ namespace GyroMouse
             }
             else
             {
-                isMovementAllowed = _isL2Pressed;
+                isMovementAllowed = _isBtnPressed;
             }
 
             UpdateLiveStats(yawDelta, pitchDelta, dx, dy, isToggleMode, isMovementAllowed);
