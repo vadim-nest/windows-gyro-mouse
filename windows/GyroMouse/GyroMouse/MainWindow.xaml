@@ -19,20 +19,13 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Orientation="Vertical">
-            <TextBlock Text="GyroMouse — Windows Receiver" 
+            <TextBlock Text="GyroMouse — PC Receiver" 
                    FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
 
             <Button x:Name="TestMouseBtn" Content="Test Mouse (+50,+50)" 
-                Click="TestMouseBtn_Click" Margin="0,0,0,12"/>
+                Click="TestMouseBtn_Click" Margin="0,0,0,20"/>
 
-            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
-                <TextBlock Text="Sensitivity:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                <Slider x:Name="SensSlider" Minimum="50" Maximum="2000" Value="500" 
-                    Width="200" ValueChanged="SensSlider_ValueChanged"/>
-                <TextBlock x:Name="SensLabel" Text="500" VerticalAlignment="Center" Margin="8,0,0,0"/>
-            </StackPanel>
-
-            <!-- NEW: Live Stats Box -->
+            <!-- Live Stats Box -->
             <Border Background="#1A1A1A" CornerRadius="8" Padding="12" Margin="0,0,0,20">
                 <TextBlock x:Name="LiveStatsBox" FontFamily="Consolas" FontSize="14" Foreground="#4CAF50" Text="Waiting for data..."/>
             </Border>

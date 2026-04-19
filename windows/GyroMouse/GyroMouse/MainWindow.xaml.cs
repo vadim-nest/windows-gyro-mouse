@@ -11,7 +11,6 @@ namespace GyroMouse
 {
     public sealed partial class MainWindow : Window
     {
-        // Check ALL 4 possible Xbox controller slots (fixes the Moonlight "Player 2" bug)
         private Controller[] _controllers = new Controller[]
         {
             new Controller(UserIndex.One),
@@ -21,6 +20,8 @@ namespace GyroMouse
         };
 
         private bool _isL2Pressed = false;
+        private bool _wasL2Pressed = false;
+        private bool _isToggleActive = false;
         private bool _isAnyControllerConnected = false;
         private DateTime _lastUiUpdate = DateTime.MinValue;
 
@@ -41,23 +42,39 @@ namespace GyroMouse
             });
         }
 
-        private void UpdateLiveStats(float yaw, float pitch, int dx, int dy)
+        private void UpdateLiveStats(float yaw, float pitch, int dx, int dy, bool isToggleMode, bool isMovementAllowed)
         {
             if ((DateTime.Now - _lastUiUpdate).TotalMilliseconds > 50)
             {
                 _lastUiUpdate = DateTime.Now;
-                string l2Status = _isAnyControllerConnected ? (_isL2Pressed ? "PRESSED (Active)" : "RELEASED (Ignored)") : "N/A (No Controller)";
+                string l2Status;
+
+                if (!_isAnyControllerConnected)
+                {
+                    l2Status = "N/A (No Controller - Always Active)";
+                }
+                else if (isToggleMode)
+                {
+                    l2Status = _isToggleActive ? "TOGGLED ON" : "TOGGLED OFF";
+                    l2Status += $" (L2 Pressed: {_isL2Pressed})";
+                }
+                else
+                {
+                    l2Status = _isL2Pressed ? "HELD (Active)" : "RELEASED (Ignored)";
+                }
 
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    LiveStatsBox.Text = $"Controller: {l2Status}\nYaw:   {yaw,8:F4} | Pitch: {pitch,8:F4}\nMouse: dx={dx,4} | dy={dy,4}";
+                    LiveStatsBox.Text = $"Mode: {(isToggleMode ? "Toggle" : "Hold")}\nController: {l2Status}\nYaw:   {yaw,8:F4} | Pitch: {pitch,8:F4}\nMouse: dx={dx,4} | dy={dy,4}";
                 });
             }
         }
-
         [DllImport("user32.dll")]
-        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize); [StructLayout(LayoutKind.Sequential)]
+        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+        [StructLayout(LayoutKind.Sequential)]
         private struct INPUT { public uint type; public MOUSEINPUT mi; }
+
         [StructLayout(LayoutKind.Sequential)]
         private struct MOUSEINPUT { public int dx, dy; public uint mouseData, dwFlags, time; public nint dwExtraInfo; }
 
@@ -108,7 +125,6 @@ namespace GyroMouse
                     {
                         anyConnected = true;
                         var state = ctrl.GetState();
-                        // 30 is the threshold out of 255 to prevent accidental light touches
                         if (state.Gamepad.LeftTrigger > 30)
                         {
                             anyL2 = true;
@@ -117,41 +133,56 @@ namespace GyroMouse
                     }
                 }
 
-                _isAnyControllerConnected = anyConnected;
+                // Edge detection for Toggle Mode (only triggers once per pull)
+                if (anyL2 && !_wasL2Pressed)
+                {
+                    _isToggleActive = !_isToggleActive;
+                }
+
+                _wasL2Pressed = anyL2;
                 _isL2Pressed = anyL2;
+                _isAnyControllerConnected = anyConnected;
 
                 await Task.Delay(20);
             }
         }
 
-        private float _sensitivity = 500f;
-
         private void HandlePacket(byte[] data)
         {
-            if (data.Length < 8) return;
+            // Now requires 16 bytes (v2 Protocol)
+            if (data.Length < 16) return;
 
             float yawDelta = BitConverter.ToSingle(data, 0);
             float pitchDelta = BitConverter.ToSingle(data, 4);
+            float sensitivity = BitConverter.ToSingle(data, 8);
+            bool isToggleMode = BitConverter.ToSingle(data, 12) > 0.5f;
 
-            int dx = (int)(yawDelta * _sensitivity);
-            int dy = (int)(pitchDelta * _sensitivity);
+            int dx = (int)(yawDelta * sensitivity);
+            int dy = (int)(pitchDelta * sensitivity);
 
-            // Send to Live Stats UI even if L2 isn't pressed (helps with debugging)
-            UpdateLiveStats(yawDelta, pitchDelta, dx, dy);
+            // Determine if mouse is allowed to move right now
+            bool isMovementAllowed = false;
+            if (!_isAnyControllerConnected)
+            {
+                isMovementAllowed = true;
+            }
+            else if (isToggleMode)
+            {
+                isMovementAllowed = _isToggleActive;
+            }
+            else
+            {
+                isMovementAllowed = _isL2Pressed;
+            }
 
-            // Only move mouse if L2 is held (OR if no controller is detected at all)
-            if (_isAnyControllerConnected && !_isL2Pressed) return;
+            UpdateLiveStats(yawDelta, pitchDelta, dx, dy, isToggleMode, isMovementAllowed);
+
+            if (!isMovementAllowed) return;
 
             if (dx != 0 || dy != 0)
             {
                 MoveMouse(dx, dy);
             }
-        }
-
-        private void SensSlider_ValueChanged(object sender, RangeBaseValueChangedEventArgs e)
-        {
-            _sensitivity = (float)e.NewValue;
-            if (SensLabel != null) SensLabel.Text = ((int)_sensitivity).ToString();
         }
 
         private void Window_Closed(object sender, WindowEventArgs args)

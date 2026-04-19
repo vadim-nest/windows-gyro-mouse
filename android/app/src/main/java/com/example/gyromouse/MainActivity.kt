@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -26,6 +27,17 @@ class MainActivity : ComponentActivity() {
         if (isGranted) toggleService(true)
     }
 
+    private fun parseIps(str: String): List<Pair<String, String>> {
+        return str.split(";").filter { it.isNotEmpty() }.mapNotNull {
+            val parts = it.split(",")
+            if (parts.size >= 2) parts[0] to parts[1] else null
+        }
+    }
+
+    private fun serializeIps(list: List<Pair<String, String>>): String {
+        return list.joinToString(";") { "${it.first},${it.second}" }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val prefs = getSharedPreferences("GyroPrefs", Context.MODE_PRIVATE)
@@ -34,18 +46,30 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
 
-                    // App State loaded from saved preferences
+                    // App States
                     var ipAddress by remember { mutableStateOf(prefs.getString("ip", "192.168.1.182") ?: "192.168.1.182") }
+                    var ipList by remember { mutableStateOf(parseIps(prefs.getString("savedIps", "Default,192.168.1.182")!!)) }
+
+                    var sensitivity by remember { mutableFloatStateOf(prefs.getFloat("sens", 500f)) }
+                    var toggleMode by remember { mutableStateOf(prefs.getBoolean("toggleMode", false)) }
                     var rot90 by remember { mutableStateOf(prefs.getBoolean("rot90", false)) }
                     var revPitch by remember { mutableStateOf(prefs.getBoolean("revPitch", false)) }
-                    var isServiceRunning by remember { mutableStateOf(GyroService.isRunning) }
 
-                    // Helper to save settings and notify the service to reload them
+                    // Toggle visibility state
+                    var showSettings by remember { mutableStateOf(prefs.getBoolean("showSettings", false)) }
+
+                    var isServiceRunning by remember { mutableStateOf(GyroService.isRunning) }
+                    var expandedDropdown by remember { mutableStateOf(false) }
+                    var showSaveDialog by remember { mutableStateOf(false) }
+
                     fun saveSettings() {
                         prefs.edit()
                             .putString("ip", ipAddress)
+                            .putFloat("sens", sensitivity)
+                            .putBoolean("toggleMode", toggleMode)
                             .putBoolean("rot90", rot90)
                             .putBoolean("revPitch", revPitch)
+                            .putBoolean("showSettings", showSettings)
                             .apply()
 
                         if (isServiceRunning) {
@@ -55,24 +79,46 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    if (showSaveDialog) {
+                        var ipName by remember { mutableStateOf("") }
+                        AlertDialog(
+                            onDismissRequest = { showSaveDialog = false },
+                            title = { Text("Save this IP Address") },
+                            text = {
+                                OutlinedTextField(value = ipName, onValueChange = { ipName = it }, label = { Text("Friendly Name") })
+                            },
+                            confirmButton = {
+                                Button(onClick = {
+                                    val newList = ipList + Pair(ipName.ifEmpty { "Saved IP" }, ipAddress)
+                                    ipList = newList
+                                    prefs.edit().putString("savedIps", serializeIps(newList)).apply()
+                                    showSaveDialog = false
+                                }) { Text("Save") }
+                            },
+                            dismissButton = { TextButton(onClick = { showSaveDialog = false }) { Text("Cancel") } }
+                        )
+                    }
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState()) // Allows scrolling when rotated sideways
-                            .padding(24.dp),
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
+                        // 1. Added more top padding
+                        Spacer(modifier = Modifier.height(64.dp))
+
                         Text("GyroMouse", style = MaterialTheme.typography.headlineLarge)
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        // Dynamic Start/Stop Button
                         Button(
                             onClick = {
                                 if (isServiceRunning) {
                                     toggleService(false)
                                     isServiceRunning = false
                                 } else {
-                                    saveSettings() // Save before starting
+                                    saveSettings()
                                     checkPermissionsAndStart()
                                     isServiceRunning = true
                                 }
@@ -85,44 +131,122 @@ class MainActivity : ComponentActivity() {
                             Text(if (isServiceRunning) "STOP TRACKING" else "START TRACKING", style = MaterialTheme.typography.titleMedium)
                         }
 
-                        Spacer(modifier = Modifier.height(32.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                        // IP Address Input
-                        OutlinedTextField(
-                            value = ipAddress,
-                            onValueChange = { ipAddress = it; saveSettings() },
-                            label = { Text("ROG Ally IP Address") },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = ipAddress,
+                                onValueChange = { ipAddress = it; saveSettings() },
+                                label = { Text("PC IP Address") },
+                                modifier = Modifier.fillMaxWidth(),
+                                trailingIcon = {
+                                    TextButton(onClick = { expandedDropdown = true }) { Text("▼") }
+                                }
+                            )
+                            DropdownMenu(
+                                expanded = expandedDropdown,
+                                onDismissRequest = { expandedDropdown = false },
+                                modifier = Modifier.fillMaxWidth(0.8f)
+                            ) {
+                                ipList.forEach { savedIp ->
+                                    DropdownMenuItem(
+                                        text = { Text("${savedIp.first} (${savedIp.second})") },
+                                        onClick = {
+                                            ipAddress = savedIp.second
+                                            expandedDropdown = false
+                                            saveSettings()
+                                        }
+                                    )
+                                }
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Save current IP...") },
+                                    onClick = {
+                                        expandedDropdown = false
+                                        showSaveDialog = true
+                                    }
+                                )
+                            }
+                        }
 
                         Spacer(modifier = Modifier.height(24.dp))
                         HorizontalDivider()
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        // Toggles
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Text("Rotate 90° (Sideways Phone)", modifier = Modifier.weight(1f))
-                            Switch(checked = rot90, onCheckedChange = { rot90 = it; saveSettings() })
+                        // 2. Settings Header with Toggle
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    showSettings = !showSettings
+                                    saveSettings()
+                                }
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Text(
+                                "Settings",
+                                style = MaterialTheme.typography.headlineSmall,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                if (showSettings) "Hide ▲" else "Show ▼",
+                                color = MaterialTheme.colorScheme.primary
+                            )
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        // 3. Conditional Visibility
+                        if (showSettings) {
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            Text("Reverse Pitch (Up/Down)", modifier = Modifier.weight(1f))
-                            Switch(checked = revPitch, onCheckedChange = { revPitch = it; saveSettings() })
+                            Text("Sensitivity: ${sensitivity.toInt()}", modifier = Modifier.align(Alignment.Start))
+                            Slider(
+                                value = sensitivity,
+                                onValueChange = { sensitivity = it; saveSettings() },
+                                valueRange = 100f..2000f,
+                                steps = 18
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Activation Mode")
+                                    Text(if (toggleMode) "Press to Toggle" else "Hold to Move", color = Color.Gray, style = MaterialTheme.typography.bodySmall)
+                                }
+                                Switch(checked = toggleMode, onCheckedChange = { toggleMode = it; saveSettings() })
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Text("Rotate 90° (Sideways Phone)", modifier = Modifier.weight(1f))
+                                Switch(checked = rot90, onCheckedChange = { rot90 = it; saveSettings() })
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                                Text("Reverse Pitch (Up/Down)", modifier = Modifier.weight(1f))
+                                Switch(checked = revPitch, onCheckedChange = { revPitch = it; saveSettings() })
+                            }
+
+                            Spacer(modifier = Modifier.height(32.dp))
+
+                            OutlinedButton(onClick = {
+                                ipAddress = "192.168.1.182"
+                                sensitivity = 500f
+                                toggleMode = false
+                                rot90 = false
+                                revPitch = false
+                                showSettings = false // Collapse on reset
+                                ipList = listOf(Pair("Default", "192.168.1.182"))
+                                prefs.edit().putString("savedIps", serializeIps(ipList)).apply()
+                                saveSettings()
+                            }) {
+                                Text("Reset All Settings")
+                            }
                         }
 
-                        Spacer(modifier = Modifier.height(48.dp))
-
-                        // Reset Button
-                        OutlinedButton(onClick = {
-                            ipAddress = "192.168.1.182"
-                            rot90 = false
-                            revPitch = false
-                            saveSettings()
-                        }) {
-                            Text("Reset Default Settings")
-                        }
+                        Spacer(modifier = Modifier.height(32.dp))
                     }
                 }
             }
@@ -144,7 +268,7 @@ class MainActivity : ComponentActivity() {
         if (start) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
         } else {
-            startService(intent) // Sending stop action to running service
+            startService(intent)
         }
     }
 }

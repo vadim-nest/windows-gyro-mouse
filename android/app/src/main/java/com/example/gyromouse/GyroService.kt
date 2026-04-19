@@ -24,7 +24,7 @@ class GyroService : Service(), SensorEventListener {
         const val ACTION_START_SERVICE = "START"
         const val ACTION_STOP_SERVICE = "STOP"
         const val ACTION_UPDATE_SETTINGS = "UPDATE"
-        var isRunning = false // Tracks state for the UI
+        var isRunning = false
     }
 
     private var PC_IP = "192.168.1.182"
@@ -34,8 +34,14 @@ class GyroService : Service(), SensorEventListener {
     private var gyroSensor: Sensor? = null
     private val udpExecutor = Executors.newSingleThreadExecutor()
 
+    private val sendBuffer = ByteBuffer.allocate(16).order(ByteOrder.LITTLE_ENDIAN)
+    private val sendDataArray = sendBuffer.array()
+    private var udpPacket: DatagramPacket? = null
+
     private var is90DegreeRotation = false
     private var isPitchReversed = false
+    private var sensitivity = 500f
+    private var isToggleMode = false
 
     override fun onCreate() {
         super.onCreate()
@@ -65,11 +71,12 @@ class GyroService : Service(), SensorEventListener {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Load latest settings from SharedPreferences
         val prefs = getSharedPreferences("GyroPrefs", Context.MODE_PRIVATE)
         PC_IP = prefs.getString("ip", "192.168.1.182") ?: "192.168.1.182"
         is90DegreeRotation = prefs.getBoolean("rot90", false)
         isPitchReversed = prefs.getBoolean("revPitch", false)
+        sensitivity = prefs.getFloat("sens", 500f)
+        isToggleMode = prefs.getBoolean("toggleMode", false)
 
         if (intent?.action == ACTION_STOP_SERVICE) {
             stopSelf()
@@ -99,15 +106,32 @@ class GyroService : Service(), SensorEventListener {
     }
 
     private fun sendMotion(dyaw: Float, dpitch: Float) {
+        // We capture the current settings values right here, right now
+        val currentSens = sensitivity
+        val currentToggle = if (isToggleMode) 1f else 0f
+
         udpExecutor.execute {
             try {
                 if (udpSocket == null) udpSocket = DatagramSocket()
-                val buf = ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN)
-                buf.putFloat(dyaw).putFloat(dpitch)
-                val data = buf.array()
-                val packet = DatagramPacket(data, data.size, InetAddress.getByName(PC_IP), PC_PORT)
-                udpSocket!!.send(packet)
-            } catch (e: Exception) { }
+
+                if (udpPacket == null) {
+                    udpPacket = DatagramPacket(sendDataArray, sendDataArray.size, InetAddress.getByName(PC_IP), PC_PORT)
+                } else if (udpPacket!!.address.hostAddress != PC_IP) {
+                    // Update IP address if you changed it in the UI
+                    udpPacket!!.address = InetAddress.getByName(PC_IP)
+                }
+
+                // Reuse the same memory block!
+                sendBuffer.clear()
+                sendBuffer.putFloat(dyaw)
+                sendBuffer.putFloat(dpitch)
+                sendBuffer.putFloat(currentSens)
+                sendBuffer.putFloat(currentToggle)
+
+                udpSocket!!.send(udpPacket!!)
+            } catch (e: Exception) {
+                // Ignore background network blips
+            }
         }
     }
 
