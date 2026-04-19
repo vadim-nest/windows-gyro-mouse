@@ -3,7 +3,6 @@
     x:Class="GyroMouse.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    xmlns:local="using:GyroMouse"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
@@ -13,23 +12,37 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid Padding="16">
+    <Grid Padding="16,48,16,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
-        <TextBlock Grid.Row="0" Text="GyroMouse — Windows Receiver" 
-               FontSize="20" Margin="0,0,0,12"/>
-        <Button x:Name="TestMouseBtn" Content="Test Mouse (+50,+50)" 
-        Click="TestMouseBtn_Click" Margin="0,0,0,8"/>
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-            <TextBlock Text="Sensitivity:" VerticalAlignment="Center" Margin="0,0,8,0"/>
-            <Slider x:Name="SensSlider" Minimum="50" Maximum="2000" Value="500" 
-            Width="200" ValueChanged="SensSlider_ValueChanged"/>
-            <TextBlock x:Name="SensLabel" Text="500" VerticalAlignment="Center" Margin="8,0,0,0"/>
+
+        <StackPanel Grid.Row="0" Orientation="Vertical">
+            <TextBlock Text="GyroMouse — Windows Receiver" 
+                   FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
+
+            <Button x:Name="TestMouseBtn" Content="Test Mouse (+50,+50)" 
+                Click="TestMouseBtn_Click" Margin="0,0,0,12"/>
+
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                <TextBlock Text="Sensitivity:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <Slider x:Name="SensSlider" Minimum="50" Maximum="2000" Value="500" 
+                    Width="200" ValueChanged="SensSlider_ValueChanged"/>
+                <TextBlock x:Name="SensLabel" Text="500" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+
+            <!-- NEW: Live Stats Box -->
+            <Border Background="#1A1A1A" CornerRadius="8" Padding="12" Margin="0,0,0,20">
+                <TextBlock x:Name="LiveStatsBox" FontFamily="Consolas" FontSize="14" Foreground="#4CAF50" Text="Waiting for data..."/>
+            </Border>
+
+            <TextBlock Text="System Logs:" FontWeight="Bold" Margin="0,0,0,8"/>
         </StackPanel>
+
+        <!-- System Logs -->
         <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <TextBlock x:Name="LogBox" TextWrapping="Wrap" FontFamily="Consolas"/>
+            <TextBlock x:Name="LogBox" TextWrapping="Wrap" FontFamily="Consolas" Foreground="Gray"/>
         </ScrollViewer>
     </Grid>
 </Window>

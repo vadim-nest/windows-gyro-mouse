@@ -1,5 +1,6 @@
 package com.example.gyromouse
 
+import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -7,75 +8,120 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.example.gyromouse.ui.theme.MyApplicationTheme // Assuming you have this
+import com.example.gyromouse.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
 
-    // Launcher for requesting notification permission on Android 13+
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
-        if (isGranted) startGyroService()
-        // If not granted, the service won't start as a foreground service,
-        // which might lead to it being killed by the OS.
+        if (isGranted) toggleService(true)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        val prefs = getSharedPreferences("GyroPrefs", Context.MODE_PRIVATE)
+
         setContent {
-            MyApplicationTheme { // Apply your app's theme
+            MyApplicationTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+
+                    // App State loaded from saved preferences
+                    var ipAddress by remember { mutableStateOf(prefs.getString("ip", "192.168.1.182") ?: "192.168.1.182") }
+                    var rot90 by remember { mutableStateOf(prefs.getBoolean("rot90", false)) }
+                    var revPitch by remember { mutableStateOf(prefs.getBoolean("revPitch", false)) }
+                    var isServiceRunning by remember { mutableStateOf(GyroService.isRunning) }
+
+                    // Helper to save settings and notify the service to reload them
+                    fun saveSettings() {
+                        prefs.edit()
+                            .putString("ip", ipAddress)
+                            .putBoolean("rot90", rot90)
+                            .putBoolean("revPitch", revPitch)
+                            .apply()
+
+                        if (isServiceRunning) {
+                            startService(Intent(this, GyroService::class.java).apply {
+                                action = GyroService.ACTION_UPDATE_SETTINGS
+                            })
+                        }
+                    }
+
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center
+                            .verticalScroll(rememberScrollState()) // Allows scrolling when rotated sideways
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Text("GyroMouse Controls", style = MaterialTheme.typography.headlineMedium)
+                        Text("GyroMouse", style = MaterialTheme.typography.headlineLarge)
                         Spacer(modifier = Modifier.height(32.dp))
 
-                        Button(onClick = { checkPermissionsAndStart() }) {
-                            Text("Start Background Gyro")
+                        // Dynamic Start/Stop Button
+                        Button(
+                            onClick = {
+                                if (isServiceRunning) {
+                                    toggleService(false)
+                                    isServiceRunning = false
+                                } else {
+                                    saveSettings() // Save before starting
+                                    checkPermissionsAndStart()
+                                    isServiceRunning = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (isServiceRunning) Color(0xFFD32F2F) else Color(0xFF388E3C)
+                            ),
+                            modifier = Modifier.fillMaxWidth().height(60.dp)
+                        ) {
+                            Text(if (isServiceRunning) "STOP TRACKING" else "START TRACKING", style = MaterialTheme.typography.titleMedium)
                         }
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        // IP Address Input
+                        OutlinedTextField(
+                            value = ipAddress,
+                            onValueChange = { ipAddress = it; saveSettings() },
+                            label = { Text("ROG Ally IP Address") },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        HorizontalDivider()
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // Toggles
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Text("Rotate 90° (Sideways Phone)", modifier = Modifier.weight(1f))
+                            Switch(checked = rot90, onCheckedChange = { rot90 = it; saveSettings() })
+                        }
+
                         Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = {
-                            val intent = Intent(this@MainActivity, GyroService::class.java).apply {
-                                action = GyroService.ACTION_STOP_SERVICE
-                            }
-                            startService(intent) // Send stop command to the service
-                        }) {
-                            Text("Stop Gyro")
+
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            Text("Reverse Pitch (Up/Down)", modifier = Modifier.weight(1f))
+                            Switch(checked = revPitch, onCheckedChange = { revPitch = it; saveSettings() })
                         }
 
-                        Spacer(modifier = Modifier.height(32.dp))
-                        Divider()
-                        Spacer(modifier = Modifier.height(32.dp))
+                        Spacer(modifier = Modifier.height(48.dp))
 
-                        Text("Tracking Settings", style = MaterialTheme.typography.headlineSmall)
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Button(onClick = {
-                            val intent = Intent(this@MainActivity, GyroService::class.java).apply {
-                                action = GyroService.ACTION_TOGGLE_ROTATE_TRACKING
-                            }
-                            startService(intent) // Send command to existing service
+                        // Reset Button
+                        OutlinedButton(onClick = {
+                            ipAddress = "192.168.1.182"
+                            rot90 = false
+                            revPitch = false
+                            saveSettings()
                         }) {
-                            Text("Toggle 90° Rotation (Sideways Phone)")
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Button(onClick = {
-                            val intent = Intent(this@MainActivity, GyroService::class.java).apply {
-                                action = GyroService.ACTION_TOGGLE_REVERSE_PITCH
-                            }
-                            startService(intent) // Send command to existing service
-                        }) {
-                            Text("Toggle Reverse Pitch (Up/Down)")
+                            Text("Reset Default Settings")
                         }
                     }
                 }
@@ -83,28 +129,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Handles checking for POST_NOTIFICATIONS permission before starting service
     private fun checkPermissionsAndStart() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             requestPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            startGyroService()
+            toggleService(true)
         }
     }
 
-    // Starts the GyroService
-    private fun startGyroService() {
+    private fun toggleService(start: Boolean) {
         val intent = Intent(this, GyroService::class.java).apply {
-            action = GyroService.ACTION_START_SERVICE // Custom action for initial start
+            action = if (start) GyroService.ACTION_START_SERVICE else GyroService.ACTION_STOP_SERVICE
         }
-        // For Android 8.0 (O) and higher, must use startForegroundService()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
+        if (start) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) startForegroundService(intent) else startService(intent)
         } else {
-            startService(intent)
+            startService(intent) // Sending stop action to running service
         }
     }
-
-    // You can remove onPause/onResume/onGenericMotionEvent/onKeyDown/onKeyUp from MainActivity
-    // as the sensor logic is now entirely in GyroService, and controller input won't work here.
 }
