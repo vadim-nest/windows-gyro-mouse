@@ -53,6 +53,23 @@ GyroMouse is a high-performance system that turns your Android device into a pre
 4. Tap **START TRACKING**.
 5. Hold (or toggle) the **L2 Trigger** on your controller to move the mouse with your device!
 
+## 🔍 Troubleshooting
+
+### Windows Receiver
+* **Mouse isn't moving in-game:** Windows prevents "lower integrity" apps from sending inputs to "higher integrity" apps (UIPI). You **must** right-click `GyroMouse.exe` and select **Run as Administrator** for it to work while a game is focused.
+* **No data received:** * Ensure your PC and Phone are on the **same Wi-Fi network**.
+    * Verify that **UDP Port 26760** is allowed in your Windows Firewall. You can quickly add a rule by running this in an Admin PowerShell:
+        `New-NetFirewallRule -DisplayName "GyroMouse UDP" -Direction Inbound -LocalPort 26760 -Protocol UDP -Action Allow`
+* **Controller not detected:** GyroMouse looks for XInput slots 1 through 4. If you use specialized virtual controller drivers, ensure they are active and visible to Windows as a standard Xbox Controller.
+
+### Android App
+* **Tracking stops when the screen is off:** Android's "Battery Optimization" is aggressive. 
+    1. Long-press the GyroMouse icon > **App Info**.
+    2. Tap **Battery**.
+    3. Select **Unrestricted**.
+* **Service disappears:** Ensure you granted **Notification Permissions**. The foreground service requires a persistent notification to prevent the OS from reclaiming memory during gameplay.
+* **Input feels laggy:** Check your Wi-Fi congestion. UDP is fast, but 2.4GHz interference can cause packet loss. 5GHz Wi-Fi is highly recommended for motion data.
+
 ---
 
 ## ⚙️ Technical Specs (v2 Protocol)
