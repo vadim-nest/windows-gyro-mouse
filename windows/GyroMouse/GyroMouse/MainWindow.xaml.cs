@@ -1,11 +1,15 @@
-﻿using Microsoft.UI.Xaml;
+﻿using Microsoft.UI;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Windowing;
+using SharpDX.XInput;
 using System;
+using System.Linq;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using SharpDX.XInput;
+using Windows.Graphics;
 
 namespace GyroMouse
 {
@@ -29,10 +33,32 @@ namespace GyroMouse
         public MainWindow()
         {
             InitializeComponent();
+            SetWindowSize(1200, 800);
             Log("App started. Monitoring ALL controller slots.");
             StartControllerMonitor();
             _ = StartUdpListenerAsync();
             Closed += Window_Closed;
+
+            // 1. Fetch the IP
+            var ip = NetworkInterface.GetAllNetworkInterfaces()
+                .FirstOrDefault(ni => ni.OperationalStatus == OperationalStatus.Up &&
+                                      ni.NetworkInterfaceType != NetworkInterfaceType.Loopback)
+                ?.GetIPProperties().UnicastAddresses
+                .FirstOrDefault(ua => ua.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                ?.Address.ToString();
+
+            // 2. Make it prominent in the UI
+            if (ip != null)
+            {
+                IpAddressText.Text = ip;
+            }
+            else
+            {
+                IpAddressText.Text = "No Connection";
+                IpAddressText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Red);
+            }
+
+            Log($"Your PC IP Address: {ip ?? "Unknown"}");
         }
 
         private void Log(string message)
@@ -207,6 +233,20 @@ namespace GyroMouse
                 _udp?.Dispose();
             }
             catch { }
+        }
+
+        private void SetWindowSize(int width, int height)
+        {
+            // Get the window handle (HWND)
+            var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            var windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
+            var appWindow = AppWindow.GetFromWindowId(windowId);
+
+            if (appWindow != null)
+            {
+                // Resize the window
+                appWindow.Resize(new SizeInt32 { Width = width, Height = height });
+            }
         }
     }
 }

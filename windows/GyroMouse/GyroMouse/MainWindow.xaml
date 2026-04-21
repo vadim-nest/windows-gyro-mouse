@@ -12,7 +12,7 @@
         <MicaBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid Padding="16,48,16,16">
+    <Grid Padding="16,24,16,16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -20,22 +20,41 @@
 
         <StackPanel Grid.Row="0" Orientation="Vertical">
             <TextBlock Text="GyroMouse — PC Receiver" 
-                   FontSize="24" FontWeight="Bold" Margin="0,0,0,20"/>
+                   FontSize="22" FontWeight="SemiBold" Margin="0,0,0,16"/>
+
+            <Border Background="#252525" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <TextBlock Text="Local IP Address: " 
+                           FontFamily="Consolas" 
+                           Foreground="Gray" 
+                           VerticalAlignment="Center"/>
+                    <TextBlock x:Name="IpAddressText" 
+                           Text="192.168.1.XX" 
+                           FontSize="20" 
+                           FontFamily="Consolas"
+                           FontWeight="Bold" 
+                           Foreground="{ThemeResource SystemAccentColor}" 
+                           Margin="8,0,0,0"
+                           VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
 
             <Button x:Name="TestMouseBtn" Content="Test Mouse (+50,+50)" 
-                Click="TestMouseBtn_Click" Margin="0,0,0,20"/>
+                HorizontalAlignment="Stretch"
+                Click="TestMouseBtn_Click" Margin="0,0,0,16"/>
 
-            <!-- Live Stats Box -->
-            <Border Background="#1A1A1A" CornerRadius="8" Padding="12" Margin="0,0,0,20">
-                <TextBlock x:Name="LiveStatsBox" FontFamily="Consolas" FontSize="14" Foreground="#4CAF50" Text="Waiting for data..."/>
+            <Border Background="#1A1A1A" CornerRadius="8" Padding="12" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="RECEIVER STATUS" FontSize="10" FontWeight="Bold" Foreground="Gray" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="LiveStatsBox" FontFamily="Consolas" FontSize="14" Foreground="#4CAF50" Text="Waiting for data..."/>
+                </StackPanel>
             </Border>
 
             <TextBlock Text="System Logs:" FontWeight="Bold" Margin="0,0,0,8"/>
         </StackPanel>
 
-        <!-- System Logs -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <TextBlock x:Name="LogBox" TextWrapping="Wrap" FontFamily="Consolas" Foreground="Gray"/>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Background="#0D0D0D" CornerRadius="4" Padding="8">
+            <TextBlock x:Name="LogBox" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" Foreground="Gray"/>
         </ScrollViewer>
     </Grid>
 </Window>
